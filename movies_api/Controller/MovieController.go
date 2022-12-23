@@ -23,6 +23,7 @@ type MovieController struct {
 
 func (m MovieController) MapEndpoints(route *gin.Engine) {
 	route.GET("/Movies", m.getMovies)
+	route.GET("/Movies/Title/:TITLE", m.getMovieByTitle)
 	route.GET("/Movies/:ID", m.getMovie)
 	route.POST("/Movies", m.addMovie)
 	route.PATCH("/Movies/:ID", m.updateMovie)
@@ -114,6 +115,73 @@ func (m MovieController) getMovie(c *gin.Context) {
 	}
 
 	query := m.Db.QueryRow("SELECT id, title, description, rating, image, created_at, updated_at FROM movies WHERE id = ?;", param)
+	if query == nil {
+		message := response.ErrorResponse{
+			ErrorCode: 404,
+			Message:   "No movies registered",
+		}
+		c.JSON(404, message)
+		return
+	}
+
+	err := query.Scan(&movie.Id, &movie.Title, &movie.Description, &movie.Rating, &movie.Image, &movie.Created_at, &movie.Updated_at)
+	if err != nil {
+		if strings.Contains(err.Error(), "sql: no rows in result set") {
+			message := response.ErrorResponse{
+				ErrorCode: 404,
+				Message:   "No movies registered",
+			}
+			c.JSON(404, message)
+			return
+		}
+		message := response.ErrorResponse{
+			ErrorCode: 500,
+			Message:   "Something wrong while scan data: " + err.Error(),
+		}
+		c.JSON(500, message)
+		return
+	}
+
+	responseMovie := response.Movie{
+		Id:          movie.Id,
+		Title:       movie.Title,
+		Description: movie.Description,
+		Rating:      movie.Rating,
+		Image:       movie.Image,
+		Created_at:  movie.Created_at.Format("2006-01-02 15:04:05"),
+		Updated_at:  movie.Updated_at.Format("2006-01-02 15:04:05"),
+	}
+
+	if err := m.Cache.Set(&cache.Item{
+		Ctx:   ctx,
+		Key:   key,
+		Value: responseMovie,
+		TTL:   time.Second * 60,
+	}); err != nil {
+		message := response.ErrorResponse{
+			ErrorCode: 500,
+			Message:   "Something wrong while caching data: " + err.Error(),
+		}
+		c.JSON(500, message)
+		return
+	}
+
+	c.JSON(200, responseMovie)
+
+}
+
+func (m MovieController) getMovieByTitle(c *gin.Context) {
+	param := c.Param("TITLE")
+	ctx := context.TODO()
+	key := "movie_" + param
+	var movie model.Movie
+
+	if err := m.Cache.Get(ctx, key, &movie); err == nil {
+		c.JSON(200, movie)
+		return
+	}
+
+	query := m.Db.QueryRow(`SELECT id, title, description, rating, image, created_at, updated_at FROM movies WHERE title LIKE ?;`, "%"+param+"%")
 	if query == nil {
 		message := response.ErrorResponse{
 			ErrorCode: 404,
