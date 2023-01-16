@@ -7,6 +7,7 @@ import (
 	"io"
 	request "movies/Contract/Request"
 	response "movies/Contract/Response"
+	query "movies/Handlers/Query"
 	model "movies/Model"
 	"strings"
 	"time"
@@ -30,101 +31,64 @@ func (m MovieController) MapEndpoints(route *gin.Engine) {
 	route.DELETE("/Movies/:ID", m.deleteMovie)
 }
 
+// GetMovies godoc
+// @Summary 	Get all movies
+// @Description Get all movies from db
+// @Tags 		movies
+// @Produce 	json
+// @Success 	200 {array} 	response.Movie
+// @Failure 	404 {object} 	response.ErrorResponse
+// @Failure 	500 {object} 	response.ErrorResponse
+// @Router		/Movies 	[get]
 func (m MovieController) getMovies(c *gin.Context) {
-	ctx := context.TODO()
-	key := "movies"
-	var movies []response.Movie
 
-	if err := m.Cache.Get(ctx, key, &movies); err == nil {
-		c.JSON(200, movies)
-		return
+	query := query.MovieQuery{
+		Db:    m.Db,
+		Cache: m.Cache,
 	}
 
-	query, err := m.Db.Query("SELECT id, title, description, rating, image, created_at, updated_at FROM movies;")
+	movies, err := query.GetAllMovieQuery()
 	if err != nil {
 		message := response.ErrorResponse{
 			ErrorCode: 500,
-			Message:   "Something wrong while fetching data: " + err.Error(),
+			Message:   "Something wrong while fetching movies: " + err.Error(),
 		}
+
 		c.JSON(500, message)
-		return
-	}
-
-	for query.Next() {
-		var movie model.Movie
-
-		err := query.Scan(&movie.Id, &movie.Title, &movie.Description, &movie.Rating, &movie.Image, &movie.Created_at, &movie.Updated_at)
-		if err != nil {
-			message := response.ErrorResponse{
-				ErrorCode: 500,
-				Message:   "Something wrong while scan data: " + err.Error(),
-			}
-			c.JSON(500, message)
-			return
-		}
-
-		responseMovie := response.Movie{
-			Id:          movie.Id,
-			Title:       movie.Title,
-			Description: movie.Description,
-			Rating:      movie.Rating,
-			Image:       movie.Image,
-			Created_at:  movie.Created_at.Format("2006-01-02 15:04:05"),
-			Updated_at:  movie.Updated_at.Format("2006-01-02 15:04:05"),
-		}
-
-		movies = append(movies, responseMovie)
 	}
 
 	if movies == nil {
 		message := response.ErrorResponse{
 			ErrorCode: 404,
-			Message:   "No movies registered",
+			Message:   "Data does not exist",
 		}
-		c.JSON(404, message)
-		return
-	}
 
-	if err := m.Cache.Set(&cache.Item{
-		Ctx:   ctx,
-		Key:   key,
-		Value: movies,
-		TTL:   time.Second * 5,
-	}); err != nil {
-		message := response.ErrorResponse{
-			ErrorCode: 500,
-			Message:   "Something wrong while caching data: " + err.Error(),
-		}
 		c.JSON(500, message)
-		return
 	}
 
 	c.JSON(200, movies)
 
 }
 
+// GetMovie godoc
+// @Summary 	Get movie by id
+// @Description get movie by id from db
+// @Tags 		movies
+// @Produce 	json
+// @Param 		id 	path 		int		true 	"movie ID"
+// @Success 	200 {array} 	response.Movie
+// @Failure 	404 {object} 	response.ErrorResponse
+// @Failure 	500 {object} 	response.ErrorResponse
+// @Router		/Movies/{id} 	[get]
 func (m MovieController) getMovie(c *gin.Context) {
 	param := c.Param("ID")
-	ctx := context.TODO()
-	key := "movie_" + param
-	var movie model.Movie
 
-	if err := m.Cache.Get(ctx, key, &movie); err == nil {
-		c.JSON(200, movie)
-		return
+	query := query.MovieQuery{
+		Db:    m.Db,
+		Cache: m.Cache,
 	}
 
-	query := m.Db.QueryRow("SELECT id, title, description, rating, image, created_at, updated_at FROM movies WHERE id = ?;", param)
-	if query == nil {
-		message := response.ErrorResponse{
-			ErrorCode: 404,
-			Message:   "No movies registered",
-		}
-		c.JSON(404, message)
-		return
-	}
-
-	err := query.Scan(&movie.Id, &movie.Title, &movie.Description, &movie.Rating, &movie.Image, &movie.Created_at, &movie.Updated_at)
+	movie, err := query.GetMovieById(param)
 	if err != nil {
 		if strings.Contains(err.Error(), "sql: no rows in result set") {
 			message := response.ErrorResponse{
@@ -142,31 +106,7 @@ func (m MovieController) getMovie(c *gin.Context) {
 		return
 	}
 
-	responseMovie := response.Movie{
-		Id:          movie.Id,
-		Title:       movie.Title,
-		Description: movie.Description,
-		Rating:      movie.Rating,
-		Image:       movie.Image,
-		Created_at:  movie.Created_at.Format("2006-01-02 15:04:05"),
-		Updated_at:  movie.Updated_at.Format("2006-01-02 15:04:05"),
-	}
-
-	if err := m.Cache.Set(&cache.Item{
-		Ctx:   ctx,
-		Key:   key,
-		Value: responseMovie,
-		TTL:   time.Second * 60,
-	}); err != nil {
-		message := response.ErrorResponse{
-			ErrorCode: 500,
-			Message:   "Something wrong while caching data: " + err.Error(),
-		}
-		c.JSON(500, message)
-		return
-	}
-
-	c.JSON(200, responseMovie)
+	c.JSON(200, movie)
 
 }
 
@@ -237,6 +177,16 @@ func (m MovieController) getMovieByTitle(c *gin.Context) {
 
 }
 
+// InsertData godoc
+// @Summary 	Insert Movie
+// @Description Insert Movie
+// @Tags 		movies
+// @Accept 		json
+// @Produce 	json
+// @Param 		request body 	request.Movie 	true "Insert Movie"
+// @Success 	200	"OK"
+// @Failure 	500 {object} 	response.ErrorResponse
+// @Router		/Movies 	[post]
 func (m MovieController) addMovie(c *gin.Context) {
 	var requestMovieBody request.Movie
 
@@ -288,6 +238,17 @@ func (m MovieController) addMovie(c *gin.Context) {
 
 }
 
+// UpdateMovie godoc
+// @Summary 	Update Movie
+// @Description Update Movie
+// @Tags 		movies
+// @Accept 		json
+// @Produce 	json
+// @Param 		id 	path 		int		true 	"Data ID"
+// @Param 		request body 	request.Movie 	true "Update Movie"
+// @Success 	200	"OK"
+// @Failure 	500 {object} 	response.ErrorResponse
+// @Router		/Movies/{id} 	[patch]
 func (m MovieController) updateMovie(c *gin.Context) {
 	param := c.Param("ID")
 	var requestMovieBody request.Movie
@@ -339,6 +300,15 @@ func (m MovieController) updateMovie(c *gin.Context) {
 	c.JSON(200, "OK")
 }
 
+// DeleteMovie godoc
+// @Summary 	Delete Movie
+// @Description Delete Movie
+// @Tags 		movies
+// @Produce 	json
+// @Param 		id 	path 		int		true 	"Data ID"
+// @Success 	200	"OK"
+// @Failure 	500 {object} 	response.ErrorResponse
+// @Router		/Movies/{id} 	[delete]
 func (m MovieController) deleteMovie(c *gin.Context) {
 	param := c.Param("ID")
 

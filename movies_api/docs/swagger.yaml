@@ -1,0 +1,190 @@
+definitions:
+  request.Movie:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      rating:
+        type: number
+      title:
+        type: string
+      updated_at:
+        type: string
+    required:
+    - created_at
+    - description
+    - id
+    - rating
+    - title
+    - updated_at
+    type: object
+  response.ErrorResponse:
+    properties:
+      error_code:
+        type: integer
+      message:
+        type: string
+    type: object
+  response.Movie:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      image:
+        type: string
+      rating:
+        type: number
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a sample server celler server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Swagger Example API
+  version: "1.0"
+paths:
+  /Movies:
+    get:
+      description: Get all movies from db
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/response.Movie'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get all movies
+      tags:
+      - movies
+    post:
+      consumes:
+      - application/json
+      description: Insert Movie
+      parameters:
+      - description: Insert Movie
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.Movie'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Insert Movie
+      tags:
+      - movies
+  /Movies/{id}:
+    delete:
+      description: Delete Movie
+      parameters:
+      - description: Data ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Delete Movie
+      tags:
+      - movies
+    get:
+      description: get movie by id from db
+      parameters:
+      - description: movie ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/response.Movie'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get movie by id
+      tags:
+      - movies
+    patch:
+      consumes:
+      - application/json
+      description: Update Movie
+      parameters:
+      - description: Data ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update Movie
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.Movie'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Update Movie
+      tags:
+      - movies
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"
